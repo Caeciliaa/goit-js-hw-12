@@ -1,5 +1,11 @@
-import { showError, createMarkup, list, lightbox } from './js/render-functions';
-import { searchImages } from './js/pixabay-api';
+import {
+  refs,
+  showError,
+  scrollCard,
+  createMarkup,
+  lightbox,
+} from './js/render-functions';
+import { searchImages, searchSettings } from './js/pixabay-api';
 import iziToast from 'izitoast';
 import 'izitoast/dist/css/iziToast.min.css';
 
@@ -17,96 +23,77 @@ iziToast.settings({
   backgroundColor: 'rgba(255, 182, 66, 0.8)',
 });
 
-let searchQuery = '';
-let page = 1;
-const perPage = 15;
+refs.searchForm.addEventListener('submit', handlerSearchButton);
+refs.loadMoreBtn.addEventListener('click', loadMoreImages);
 
-const form = document.querySelector('.js-search-form');
-const loader = document.querySelector('.loader');
-const galleryContainer = document.querySelector('.gallery');
-const loadButton = document.querySelector('.load-button');
+let currentPage;
+let totalPage;
 
-form.addEventListener('submit', handlerAddSearch);
-loadButton.addEventListener('click', loadMoreImages);
-
-async function handlerAddSearch(event) {
+async function handlerSearchButton(event) {
   event.preventDefault();
 
-  searchQuery = event.currentTarget.elements.query.value.trim();
-
-  if (searchQuery === '') {
-    list.innerHTML = '';
-    return showError('Enter data to search');
+  const searchQuery = event.target.query.value.trim();
+  if (!searchQuery) {
+    showError('Enter data to search');
+    return;
   }
 
-  list.innerHTML = '';
-  page = 1;
-  loader.classList.remove('hidden');
-  loadButton.classList.add('hidden');
+  searchSettings.q = searchQuery;
+  searchSettings.page = 1;
+
+  refs.galleryContainer.innerHTML = '';
+  refs.loadMoreBtn.classList.remove('visible');
+  refs.loader.classList.add('visible');
 
   try {
-    const data = await searchImages(searchQuery, page, perPage);
-    console.log('API Response:', data);
+    const data = await searchImages(
+      searchQuery,
+      searchSettings.page,
+      searchSettings.per_page
+    );
+    totalPage = Math.ceil(data.totalHits / searchSettings.per_page);
 
     if (data.hits.length === 0) {
-      throw new Error(
+      showError(
         'Sorry, there are no images matching your search query. Please try again!'
       );
+      return;
     }
 
-    const markup = createMarkup(data.hits);
-    galleryContainer.innerHTML = markup;
+    createMarkup(data.hits);
     lightbox.refresh();
-    loadButton.classList.remove('hidden');
 
-    if (data.hits.length < perPage || data.totalHits <= page * perPage) {
-      loadButton.classList.add('hidden');
-      iziToast.info({
-        message: "We're sorry, but you've reached the end of search results.",
-        backgroundColor: '#ef4040',
-        maxWidth: 432,
-        timeout: 3000,
-        messageColor: '#fafafb',
-        messageSize: '16',
-        theme: 'dark',
-        progressBarColor: '#b51b1b',
-        position: 'topRight',
-      });
+    if (totalPage > searchSettings.page) {
+      refs.loadMoreBtn.classList.add('visible');
+      setTimeout(() => {
+        refs.loadMoreBtn.classList.add('fade-in');
+      }, 3000);
     }
   } catch (err) {
     showError(err.message);
   } finally {
-    loader.classList.add('hidden');
+    refs.loader.classList.remove('visible');
+    refs.searchForm.reset();
   }
-
-  inputForm.reset();
 }
 
 async function loadMoreImages() {
-  page += 1;
-  loader.classList.remove('hidden');
-  loadButton.classList.add;
+  refs.loader.classList.add('visible');
+  refs.loadMoreBtn.classList.remove('visible');
 
+  searchSettings.page += 1;
   try {
-    const data = await searchImages(searchQuery, page, perPage);
-    console.log('API Response:', data);
-
-    const markup = createMarkup(data.hits);
-    galleryContainer.insertAdjacentHTML('beforeend', markup);
+    const data = await searchImages(
+      searchSettings.q,
+      searchSettings.page,
+      searchSettings.per_page
+    );
+    createMarkup(data.hits, true);
     lightbox.refresh();
-    loadButton.classList.remove('hidden');
+    scrollCard();
 
-    const { height: cardHeight } = document
-      .querySelector('.gallery')
-      .firstElementChild.getBoundingClientRect();
-
-    window.scrollBy({
-      top: cardHeight * 2,
-      behavior: 'smooth',
-    });
-
-    if (data.hits.length < perPage || data.totalHits <= page * perPage) {
-      loadButton.classList.add('hidden');
+    if (totalPage === searchSettings.page) {
+      refs.loadMoreBtn.classList.remove('visible');
       iziToast.info({
         message: "We're sorry, but you've reached the end of search results.",
         backgroundColor: '#ef4040',
@@ -118,10 +105,12 @@ async function loadMoreImages() {
         progressBarColor: '#b51b1b',
         position: 'topRight',
       });
+    } else {
+      refs.loadMoreBtn.classList.add('visible');
     }
   } catch (err) {
     showError(err.message);
   } finally {
-    loader.classList.add('hidden');
+    refs.loader.classList.remove('visible');
   }
 }

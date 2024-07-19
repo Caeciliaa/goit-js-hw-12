@@ -1,7 +1,5 @@
 import iziToast from 'izitoast';
-import 'izitoast/dist/css/iziToast.min.css';
 import SimpleLightbox from 'simplelightbox';
-import 'simplelightbox/dist/simple-lightbox.min.css';
 
 export const refs = {
   searchForm: document.querySelector('.js-search-form'),
@@ -81,5 +79,4 @@ export const lightbox = new SimpleLightbox('.gallery a', {
   captionDelay: 250,
   scrollZoom: false,
 });
-
 lightbox.on('show.simplelightbox', function () {});
